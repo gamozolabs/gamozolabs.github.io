@@ -554,7 +554,7 @@ rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
 --- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=53776, si_uid=1000} ---
 ```
 
-We see the `open`, `fstat` to get the length, `read` to read the file, and `close` when it's done parsing. So what is the `rt_sigprocmask()` and beyond? Well in persistent mode AFL uses this to communicate when fuzz cases are done. You can actually find this code in `afl-2.52b/llvm_mode/afl-llvm-rt.o.c`. There's a descriptive comment:
+We see the `openat` to open, `read` to read the file, and `close` when it's done parsing. So what is the `rt_sigprocmask()` and beyond? Well in persistent mode AFL uses this to communicate when fuzz cases are done. You can actually find this code in `afl-2.52b/llvm_mode/afl-llvm-rt.o.c`. There's a descriptive comment:
 
 ```
     /* In persistent mode, the child stops itself with SIGSTOP to indicate
@@ -562,7 +562,7 @@ We see the `open`, `fstat` to get the length, `read` to read the file, and `clos
        again. */
 ```
 
-This means that the `rt_sigprocmask()` and beyond is out of our control. But other than that we're doing the bare minimum to read a file by doing open, read, and close. Nothing else. In theory we could maybe get rid of that second `read()` since that's just to get `EOF`. But we have verified that this single process is running multiple fuzz cases. There are some timeouts in `afl` that may kill this child, and I observed that it seems that roughly 200 fuzz cases get used per instance before hitting a slow case that gets killed or some other unexpected process exit. This is plenty, we don't need to do all 100k iterations per process. This is going to reduce our `fork()` frequency by 200x which is going to help a lot!
+This means that the `rt_sigprocmask()` and beyond is out of our control. But other than that we're doing the bare minimum to read a file by doing open, read, and close. Nothing else. We're running tens of thousands of fuzz cases in a single instance of this program without having to `exit()` out and `fork()`!
 
 Alright! Let's put it all together and fuzz with this new binary on all cores!
 
