@@ -7,6 +7,13 @@ categories: fuzzing
 
 ![That's a lot of cores](/assets/afl_256thread.png)
 
+# Changelog
+
+Date       | Info
+-----------|-------------
+2018-09-16 | Initial
+2018-09-16 | Changed custom JPEG test program a little, saves 2 syscalls bringing us from 9 per fuzz case to 7 fuzz case. Used `-O2` flag to build. Neither of these had a noticeable impact on performance thus performance numbers were not updated.
+
 # Performance disclaimer
 
 Performance is critical to my work and I've been researching specifically fuzzer performance and scaling for the past 5 years. It's important that the performance numbers here are accurate and use tooling to their fullest. Please let me know about any suggestions that I could do to make these numbers better while still using unmodified AFL. I also was using a stock `libjpeg` as I do not want to make internal mods to JPEG as that increases risk of invalid results.
@@ -395,7 +402,10 @@ afl-clang-fast 2.52b by <lszekeres@google.com>
 So, `libjpeg-turbo` is a library. Meaning it's designed to be used from other programs. It's also one of the most popular libraries for image compression, so surely it's relatively easy to use. Let's quickly write up a bare-bones application that loads an image from a provided argument:
 
 ```c
+#include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include "jpeglib.h"
 #include <setjmp.h>
 
@@ -420,15 +430,24 @@ METHODDEF(void)
 emit_message(j_common_ptr cinfo, int msg_level) {}
 
 GLOBAL(int)
-read_JPEG_file (char * filename)
+read_JPEG_file (char * filename, unsigned char *filebuf, size_t filebuflen)
 {
   struct jpeg_decompress_struct cinfo;
   struct my_error_mgr jerr;
-  FILE * infile;                /* source file */
   JSAMPARRAY buffer;            /* Output row buffer */
   int row_stride;               /* physical row width in output buffer */
-  if ((infile = fopen(filename, "rb")) == NULL) {
-    fprintf(stderr, "can't open %s\n", filename);
+  int fd;
+  ssize_t flen;
+
+  fd = open(filename, O_RDONLY);
+  if(fd == -1){
+    return 0;
+  }
+
+  flen = read(fd, (void*)filebuf, filebuflen);
+  close(fd);
+
+  if(flen <= 0){
     return 0;
   }
 
@@ -439,12 +458,11 @@ read_JPEG_file (char * filename)
   /* Establish the setjmp return context for my_error_exit to use. */
   if (setjmp(jerr.setjmp_buffer)) {
     jpeg_destroy_decompress(&cinfo);
-    fclose(infile);
     return 0;
   }
 
   jpeg_create_decompress(&cinfo);
-  jpeg_stdio_src(&cinfo, infile);
+  jpeg_mem_src(&cinfo, filebuf, flen);
   (void) jpeg_read_header(&cinfo, TRUE);
   (void) jpeg_start_decompress(&cinfo);
   row_stride = cinfo.output_width * cinfo.output_components;
@@ -457,15 +475,22 @@ read_JPEG_file (char * filename)
 
   (void) jpeg_finish_decompress(&cinfo);
   jpeg_destroy_decompress(&cinfo);
-  fclose(infile);
   return 1;
 }
 
 int main(int argc, char *argv[]) {
+  void *filebuf = NULL;
+  const size_t filebuflen = 32 * 1024;
+
   if(argc != 2) { fprintf(stderr, "Nice usage noob\n"); return -1; }
 
+  filebuf = malloc(filebuflen);
+  if(!filebuf) {
+    return -1;
+  }
+
   while(__AFL_LOOP(100000)) {
-    read_JPEG_file(argv[1]);
+    read_JPEG_file(argv[1], filebuf, filebuflen);
   }
 }
 ```
@@ -473,7 +498,7 @@ int main(int argc, char *argv[]) {
 This can be built with:
 
 ```
-AFL_PATH=/home/pleb/blogging/afl-2.52b afl-clang-fast -m32 example.c -I/home/pleb/blogging/buildjpeg -I/home/pleb/blogging/libjpeg-turbo /home/pleb/blogging/buildjpeg/libjpeg.a
+AFL_PATH=/home/pleb/blogging/afl-2.52b afl-clang-fast -O2 -m32 example.c -I/home/pleb/blogging/buildjpeg -I/home/pleb/blogging/libjpeg-turbo /home/pleb/blogging/buildjpeg/libjpeg.a
 ```
 
 You can see the code this was derived from with more comments [here][jpeg turbo example] which I modified to my specific needs and removed almost all comments to keep code as small as possible. It's also relatively simple to read based off function names.
@@ -506,31 +531,27 @@ We can see we get a repeating pattern:
 
 ```
 openat(AT_FDCWD, "/mnt/ram/outputs//.cur_input", O_RDONLY) = 3
-fstat64(3, {st_mode=S_IFREG|0600, st_size=3251, ...}) = 0
-read(3, "\377\330\377\340\0\20JFIF\0\1\1\0\0\1\0\1\0\0\377\333\0C\0\5\3\4\4\4\3\5"..., 4096) = 3251
-read(3, "", 4096)                       = 0
+read(3, "\377\330\377\340\0\20JFIF\0\1\1\0\0\1\0\1\0\0\377\333\0C\0\5\3\4\4\4\3\5"..., 32768) = 3251
 close(3)                                = 0
 rt_sigprocmask(SIG_BLOCK, ~[RTMIN RT_1], [], 8) = 0
-getpid()                                = 51721
-gettid()                                = 51721
-tgkill(51721, 51721, SIGSTOP)           = 0
---- SIGSTOP {si_signo=SIGSTOP, si_code=SI_TKILL, si_pid=51721, si_uid=1000} ---
+getpid()                                = 53786
+gettid()                                = 53786
+tgkill(53786, 53786, SIGSTOP)           = 0
+--- SIGSTOP {si_signo=SIGSTOP, si_code=SI_TKILL, si_pid=53786, si_uid=1000} ---
 --- stopped by SIGSTOP ---
 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
---- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=51643, si_uid=1000} ---
+--- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=53776, si_uid=1000} ---
 openat(AT_FDCWD, "/mnt/ram/outputs//.cur_input", O_RDONLY) = 3
-fstat64(3, {st_mode=S_IFREG|0600, st_size=3251, ...}) = 0
-read(3, "\377\330\377\340\0\20JFIF\0\1\1\0\0\1\0\1\0\0\377\333\0C\0\5\3\4\4\4\3\5"..., 4096) = 3251
-read(3, "", 4096)                       = 0
+read(3, "\377\330\377\340\0\20JFIF\0\1\1\0\0\1\0\1\0\0\377\333\0C\0\5\3\4\4\4\3\5"..., 32768) = 3251
 close(3)                                = 0
 rt_sigprocmask(SIG_BLOCK, ~[RTMIN RT_1], [], 8) = 0
-getpid()                                = 51721
-gettid()                                = 51721
-tgkill(51721, 51721, SIGSTOP)           = 0
---- SIGSTOP {si_signo=SIGSTOP, si_code=SI_TKILL, si_pid=51721, si_uid=1000} ---
+getpid()                                = 53786
+gettid()                                = 53786
+tgkill(53786, 53786, SIGSTOP)           = 0
+--- SIGSTOP {si_signo=SIGSTOP, si_code=SI_TKILL, si_pid=53786, si_uid=1000} ---
 --- stopped by SIGSTOP ---
 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
---- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=51643, si_uid=1000} ---
+--- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=53776, si_uid=1000} ---
 ```
 
 We see the `open`, `fstat` to get the length, `read` to read the file, and `close` when it's done parsing. So what is the `rt_sigprocmask()` and beyond? Well in persistent mode AFL uses this to communicate when fuzz cases are done. You can actually find this code in `afl-2.52b/llvm_mode/afl-llvm-rt.o.c`. There's a descriptive comment:
@@ -560,7 +581,7 @@ Summary stats
        Crashes found : 0 locally unique
 ```
 
-Woo 56k per second! More than the 2x we were expecting from the custom written target. And I'll save you another `htop` image and just tell you that now only about 8% of CPU time is spent in the kernel. Given we're doing 9 syscalls per fuzz case, that means we're doing about 500k per second, which still is fairly high but most of the syscalls are due to AFL and not us so they're out of our control.
+Woo 56k per second! More than the 2x we were expecting from the custom written target. And I'll save you another `htop` image and just tell you that now only about 8% of CPU time is spent in the kernel. Given we're doing 7 syscalls per fuzz case, that means we're doing about 400k per second, which still is fairly high but most of the syscalls are due to AFL and not us so they're out of our control.
 
 # Conclusion
 
