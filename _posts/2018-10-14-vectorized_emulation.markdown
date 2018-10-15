@@ -50,25 +50,25 @@ My history with fuzzing tools starts off effectively with my hypervisor for fuzz
 
 More and more after working with QEMU I got annoyed. It's designed for whole systems yet I was using it for fuzzing targets that were running with unknown hardware and running from dynamically dumped memory snapshots. Due to the level of abstraction in QEMU I started to get concerned with the potential unknowns that would affect the instrumentation and fuzzing of targets.
 
-I developed my first emulator, a crappy MIPS emulator. It was designed not to be aimed at performance, but rather purely for simple usage and perfect single stepping. You step an instruction, registers and memory get updated. No JIT, no intermediate registers, no flushing or weird block level translation changes. I eventually made a JIT for this that maintained the flush-state-every-instruction model and successfully used it against multiple targets. I also developed an ARM emulator somewhere in this timeframe.
+I developed my first MIPS emulator. It was not designed for performance, but rather purely for simple usage and perfect single stepping. You step an instruction, registers and memory get updated. No JIT, no intermediate registers, no flushing or weird block level translation changes. I eventually made a JIT for this that maintained the flush-state-every-instruction model and successfully used it against multiple targets. I also developed an ARM emulator somewhere in this timeframe.
 
 When early 2017 rolls around I'm bored and want to buy a Xeon Phi. Who doesn't want a 64-core 256-thread single processor? I really had no need for the machine so I just made up some excuse in my head that the high bandwidth memory on die would make reverting snapshots faster. Yeah... like that really matters? Oh well, I bought it.
 
-While the machine was on the way I had this idea that when fuzzing from a snapshot all VMs initially start off fuzzing with the exact same state, except for maybe an input buffer and length being changed. Thus they do identical operations until user-controlled data is processed. I've done some fun vectorization work before, but what got me thinking is why not just emit `vpaddd` instead of `add` when JITting, and now I can run 16 VMs at a time!
+While the machine was on the way I had this idea... when fuzzing from a snapshot all VMs initially start off fuzzing with the exact same state, except for maybe an input buffer and length being changed. Thus they do identical operations until user-controlled data is processed. I've done some fun vectorization work before, but what got me thinking is why not just emit `vpaddd` instead of `add` when JITting, and now I can run 16 VMs at a time!
 
 Alas... the idea was born
 
 # A primer on snapshot fuzzing
 
-Snapshot fuzzing is fundamental to this work and almost all fuzzing work I have done from 2014 and beyond. It warrants it's own blog entirely. However let's get you familiar with the concept before we go on!
+Snapshot fuzzing is fundamental to this work and almost all fuzzing work I have done from 2014 and beyond. It warrants its own blog entirely.
 
-Snapshot fuzzing is a method of fuzzing where you start from an already partially-executed system state. For example I can run an application under GDB like a parser, put a breakpoint after the file/network data has been read, and then dump memory and register state to a core dump using `gcore`. At this point I have full memory and register state for the application. I can then load up this core dump into any emulator, set up memory contents and permissions, set up register state, and continue execution. While this is an example with core dumps on Linux, this methodology works the same whether the snapshot is a core dump from GDB, a minidump on Windows, or even an exotic memory dump taken from an exploit on a locked-down device like a phone.
+Snapshot fuzzing is a method of fuzzing where you start from an already partially-executed system state. For example I can run an application under GDB, like a parser, put a breakpoint after the file/network data has been read, and then dump memory and register state to a core dump using `gcore`. At this point I have full memory and register state for the application. I can then load up this core dump into any emulator, set up memory contents and permissions, set up register state, and continue execution. While this is an example with core dumps on Linux, this methodology works the same whether the snapshot is a core dump from GDB, a minidump on Windows, or even an exotic memory dump taken from an exploit on a locked-down device like a phone.
 
 All that matters is that I have memory state and register state. From this point I can inject/modify the file contents in memory and continue execution with a new input!
 
 It can get a lot more complex when dealing with kernel state, like file handles, network packets buffered in the kernel, and really anything that syscalls. However in most targets you can make some custom rigging using `strace` to know which FDs line up, where they are currently seeked, etc. Further a full system snapshot can be used instead of a single application and then this kernel state is no longer a concern.
 
-The benefits of snapshot fuzzing are performance (most importantly, scaling), high levels of introspection (even without source or symbols), and most importantly... determinism. Unless the emulator has bugs snapshot fuzzing is typically deterministic (sometimes relaxed for performance). Find some super exotic race condition while snapshot fuzzing? Well, you can single step through with the same input and now you can look at the trace as a human. Even if it's a 1 in a billion chance of hitting.
+The benefits of snapshot fuzzing are performance (linear scaling), high levels of introspection (even without source or symbols), and most importantly... determinism. Unless the emulator has bugs snapshot fuzzing is typically deterministic (sometimes relaxed for performance). Find some super exotic race condition while snapshot fuzzing? Well, you can single step through with the same input and now you can look at the trace as a human, even if it's a 1 in a billion chance of hitting.
 
 # A primer on vectorized instruction sets
 
@@ -110,7 +110,7 @@ The syntax for the common instructions using kmasks are the following:
 
 `vpaddd zmm0 {k1}, zmm1, zmm2`
 
-_chart simplified to show only 4 lanes instead of 16_
+_chart simplified to show 4 lanes instead of 16_
 
 Register | Dword 1 | Dword 2 | Dword 3 | Dword 4
 ---------|---------|---------|---------|---------|
@@ -124,7 +124,7 @@ or
 
 `vpaddd zmm0 {k1}{z}, zmm1, zmm2`
 
-_chart simplified to show only 4 lanes instead of 16_
+_chart simplified to show 4 lanes instead of 16_
 
 Register | Dword 1 | Dword 2 | Dword 3 | Dword 4
 ---------|---------|---------|---------|---------|
@@ -224,7 +224,7 @@ Since most VM memory operations are not affected by user input, and thus are the
 
 This is pretty simple, just interleave at the dword level:
 
-_chart simplified to show only 4 lanes instead of 16_
+_chart simplified to show 4 lanes instead of 16_
 
 Guest Address | Host Address | Dword 1 | Dword 2 | Dword 3 | ... | Dword 16
 --------------|--------------|---------|---------|---------|-----|---------|
@@ -270,7 +270,7 @@ Well by using a kmask register on _all_ JITted AVX-512 instructions we can simpl
 
 What this allows us to do is start execution at the same location on all 16 VMs as they start with the same EIP. On all branches we will horizontally compare the branch targets and compute a new kmask value to use when we continue execution on the new branch.
 
-Since AVX-512 doesn't have a great way of extracting or broadcasting arbitrary elements of a vector, but does have a good way of broadcasting the 0th lane in a vector ala `vpbroadcastd zmm0, xmm0`, which takes the first lane from `xmm0` and broadcasts it to all 16 lanes in `zmm0`. We actually never stop following VM #0. This means VM #0 is always executing, which is important for all of the horizontal compares that we talk about. When I say horizontal compare I mean a broadcast of the VM#0 and compare with all other VMs.
+AVX-512 doesn't have a great way of extracting or broadcasting arbitrary elements of a vector. However it has a fast way to broadcast the 0th lane in a vector ala `vpbroadcastd zmm0, xmm0`. This takes the first lane from `xmm0` and broadcasts it to all 16 lanes in `zmm0`. We actually never stop following VM #0. This means VM #0 is always executing, which is important for all of the horizontal compares that we talk about. When I say horizontal compare I mean a broadcast of the VM#0 and compare with all other VMs.
 
 Let's look in-detail at the entire JIT that I use for conditional indirect branches:
 
@@ -327,7 +327,7 @@ vpcmpeqd k1, zmm0, zmm31
 ; Or break out and generate the JIT if it hasn't been hit before
 ````
 
-The above code is quite fast and isn't a huge performance issue, especially as we're running 16 VMs at a time and branches are "rare" with respect to expensive operations like memory operations.
+The above code is quite fast and isn't a huge performance issue, especially as we're running 16 VMs at a time and branches are "rare" with respect to expensive operations like memory loads and stores.
 
 One thing that is important to note is that `zmm31` always contains the last desired branch target for a given VM. Even after it has been disabled. This means that it is possible for a VM which has been disabled to come back online if VM #0 ends up going to the same location.
 
@@ -346,7 +346,7 @@ jne .end
 .next:
 
 ; Check some magic from the buffer
-cmp [ebx], 0x13371337
+cmp dword ptr [ebx], 0x13371337
 jne .end
 
 ; Fallthrough
@@ -361,11 +361,17 @@ jmp .end
 And the theoretical vectorized output (not actual JIT output):
 
 ```nasm
+; Register allocation:
 ; zmm10 - ebx
 ; zmm11 - ecx
+; k1    - The execution kmask, this is the kmask used on all JITted instructions
+; k2    - Temporary kmask, just used for scratch
+; zmm0  - Scratch register
+; zmm8  - Scratch register
+; zmm31 - Desired branch target for all lanes
 
 ; Compute kmask register for VMs which have `ecx` == 4
-vpcmpeqd k2 {k1}, zmm10, dword ptr [memory containing 4] {1to16}
+vpcmpeqd k2 {k1}, zmm11, dword ptr [memory containing 4] {1to16}
 
 ; Update zmm31 to reference the respective branch target
 vmovdqa32 zmm31 {k1}, address of .end  ; By default we go to end
@@ -428,7 +434,7 @@ ecx      |                 4 |                 3 |                 4 |          
 memory   |        0x13371337 |        0x13371337 |                 3 |        0x13371337 |
 K1       |                 1 |                 1 |                 1 |                 1 |
 
-First branch, all VMs with ecx != 4 are disabled and are pending branches to `.end`, _VM #1 falls off_
+First branch, all VMs with `ecx != 4` are disabled and are pending branches to `.end`, _VM #1 falls off_
 
 Register |              VM 0 |              VM 1 |              VM 2 |              VM 3 |
 ---------|-------------------|-------------------|-------------------|-------------------|
@@ -457,9 +463,9 @@ Zmm31    |              .end |              .end |              .end |          
 
 #### Branch summary
 
-So we saw branches will disable VMs which do not follow VM #0. When VMs are disabled all modifications to their register states or memory states are blocked by hardware via the kmask mechanism which allows us to keep performance up and not use different JITs based on different branch states.
+So we saw branches will disable VMs which do not follow VM #0. When VMs are disabled all modifications to their register states or memory states are blocked by hardware. The kmask mechanism allows us to keep performance up and not use different JITs based on different branch states.
 
-Further VMs can come back online if they were pending to go to a location which VM #0 eventually ends up going to.
+Further, VMs can come back online if they were pending to go to a location which VM #0 eventually ends up going to.
 
 #### Exceptions/faults
 
@@ -478,13 +484,13 @@ _At this point all of the next topics are going to be their own blogs and thus a
 
 Differential coverage is a special type of coverage that we are able to gather with this vectorized emulation model. This is the most important aspect of all of this tooling and is the main reason it is worth doing.
 
-Since we are running 16 VMs at a time we are able to very cheaply (a few cycles) do a horizontal comparison with other VMs. Since VMs are deterministic and only have differing user-controlled inputs _any_ situation where VMs have different branches, different register states, different memory states, etc is when the user input directly or indirectly caused the change in behavior.
+Since we are running 16 VMs at a time we are able to very cheaply (a few cycles) do a horizontal comparison with other VMs. Since VMs are deterministic and only have differing user-controlled inputs _any_ situation where VMs have different branches, different register states, different memory states, etc is when the user input directly or indirectly caused a change in behavior.
 
 I would consider this to be the holy grail of coverage. Any affect the input has on program state we can easily and cheaply detect.
 
 #### How differential coverage combats state explosion
 
-If we wanted to track all register states for all instructions the state explosion would be way too huge. This can be somewhat capped by limiting the amount of state each instruction can generate. For example instead of storing all unique register values for an instruction we could simply store the mins and maximums, or store up to n unique values, etc. However even when limited to just a few values per instruction, the state explosion is too large for any real application.
+If we wanted to track all register states for all instructions the state explosion would be way too huge. This can be somewhat capped by limiting the amount of state each instruction can generate. For example instead of storing all unique register values for an instruction we could simply store the minimums and maximums, or store up to `n` unique values, etc. However even when limited to just a few values per instruction, the state explosion is too large for any real application.
 
 However, since most memory and register states are not influenced by user input, with differential coverage we can greatly reduce the amount of instructions which state is stored on as we only store state that was influenced by user data.
 
@@ -498,11 +504,11 @@ For example all of my register loads and stores start with a horizontal compare 
 
 # Soft MMU
 
-Since the soft MMU deserved a blog entirely on it's own. We'll just go slightly into the details.
+Since the soft MMU deserves a blog entirely on it's own, we'll just go slightly into the details.
 
-As mentioned before we interleave memory at the dword level, but for every byte there is also a corresponding permission byte. In memory this looks like 16 32-bit dwords representing the permissions, followed by 16 32-bit dwords containing their corresponding memory contents. This allows me to read a 64-byte cache line with the permissions which are checked first, followed by reading the 64-byte cache line directly following with the contents.
+As mentioned before, we interleave memory at the dword level, but for every byte there is also a corresponding permission byte. In memory this looks like 16 32-bit dwords representing the permissions, followed by 16 32-bit dwords containing their corresponding memory contents. This allows me to read a 64-byte cache line with the permissions which are checked first, followed by reading the 64-byte cache line directly following with the contents.
 
-For permissions the read, write, and execute bits are completely separate. This allows more exotic memory models like execute-only memory.
+For permissions: the read, write, and execute bits are completely separate. This allows more exotic memory models like execute-only memory.
 
 Since permissions are at the byte level, this means we can punch a one-byte hole anywhere in memory and accessing that byte would cause a fault. For some targets I'll do special modifications to permissions and punch holes in unused or padding fields of structures to catch overflows of buffers contained inside structures.
 
@@ -512,7 +518,7 @@ Further I have a special read-after-write (RaW) bit, which is used to mark memor
 
 Performance is not the goal of this project, however the numbers are a bit better than expected from the theorycrafting.
 
-In reality it's possible to hit up to 2 trillion emulated instructions per second, which is the clickbait title of this blog. However in reality this is on a 32-deep unrolled loop that is just adding numbers and not hitting memory. This unrolling makes the branch divergence checking costs disappear, and integer operations are almost a 1-to-1 translation into AVX-512 instructions.
+In reality it's possible to hit up to 2 trillion emulated instructions per second, which is the clickbait title of this blog. However this is on a 32-deep unrolled loop that is just adding numbers and not hitting memory. This unrolling makes the branch divergence checking costs disappear, and integer operations are almost a 1-to-1 translation into AVX-512 instructions.
 
 For a real target the numbers are more in the 40 billion to 120 billion emulated instructions per second range. For a real target like OpenBSD's DHCP client I'm able to do just over 5 million fuzz cases per second (fuzz case is one DHCP transaction, typically 1 or 2 packets). For this specific target the emulation speed is 54 billion instructions per second. This is while gathering PC-level coverage and all register and memory divergence coverage.
 
@@ -526,11 +532,15 @@ It was also used to find a theoretical OOB in OpenBSD's dhclient: [dhclient bug]
 
 # Future blogs
 
-Internal details of the MMU implementation
+- Description of the IL used, as it's got some specific designs for vectorized emulation
 
-Showing the power of differential coverage by looking a real example of fuzzing an HTTP parser and having a byte flipper quickly (under 5 seconds) find the basic "VERB <path> HTTP/number.number\r\n". No magic, no `strings` feedback, no static analysis. Just a useless fuzzer with strong harnessing.
+- Internal details of the MMU implementation
 
-Showing better branch divergence handling via post-dominator analysis and stepping VMs until they sync up at a known future merge point
+- Showing the power of differential coverage by looking a real example of fuzzing an HTTP parser and having a byte flipper quickly (under 5 seconds) find the basic "VERB <path> HTTP/number.number\r\n". No magic, no `strings` feedback, no static analysis. Just a useless fuzzer with strong harnessing.
+
+- Talk about the new IL which handles graphs and can do cross-block optimizations
+
+- Showing better branch divergence handling via post-dominator analysis and stepping VMs until they sync up at a known future merge point
 
 [gamozo]: https://twitter.com/gamozolabs
 [falkervisor]: https://github.com/gamozolabs/falkervisor_grilled_cheese
