@@ -19,6 +19,10 @@ Follow me at [@gamozolabs][gamozo] on Twitter if you want notifications when new
 
 I recognize the bugs discussed here are not widespread Android bugs individually. None of these are terribly critical and typically only affect one specific device. This blog is meant to be fun and silly and not meant to be a serious review of Android's security.
 
+# Give me the code
+
+https://github.com/gamozolabs/slime_tree
+
 # Intro
 
 Today we're going to write arguably one of the worst Android fuzzers possible. Experience unexpected success, and then make improvements to make it probably the second worst Android fuzzer.
@@ -265,7 +269,7 @@ pub fn daemonize() {
 
 Pretty simple, nothing crazy here. We get a full phone directory listing, spin up `MAX_THREADS` threads, and those threads loop forever picking random files to read and write to.
 
-Let me just give this a little push to the phone annnnnnnnnnnnnnd... __and the phone paniced__. In fact almost all the phones I have at my desk paniced!
+Let me just give this a little push to the phone annnnnnnnnnnnnnd... __and the phone panicked__. In fact almost all the phones I have at my desk panicked!
 
 _There we go. We have created a world class Android kernel fuzzer, printing out new 0-day!_
 
@@ -596,6 +600,33 @@ PC is at sysfs_open_file+0x4c/0x208
 LR is at sysfs_open_file+0x40/0x208
 pc : [<ffffffc00034e124>] lr : [<ffffffc00034e118>] pstate: 60000045
 sp : ffffffc002827b70
+```
+
+#### G920F (Exynos Galaxy S6) [G920FXXU5DQBC] (Febuary 1, 2017) Now gated by selinux :(
+
+```
+sec_debug_store_fault_addr 0xffffff80000fe008
+Unhandled fault: synchronous external abort (0x96000010) at 0xffffff80000fe008
+------------[ cut here ]------------
+Kernel BUG at ffffffc0003b6558 [verbose debug info unavailable]
+Internal error: Oops - BUG: 96000010 [#1] PREEMPT SMP
+exynos-snapshot: core register saved(CPU:0)
+CPUMERRSR: 0000000012100088, L2MERRSR: 00000000111f41b8
+exynos-snapshot: context saved(CPU:0)
+exynos-snapshot: item - log_kevents is disabled
+CPU: 0 PID: 5241 Comm: hookah Tainted: G        W      3.18.14-9519568 #1
+Hardware name: Samsung UNIVERSAL8890 board based on EXYNOS8890 (DT)
+task: ffffffc830513000 ti: ffffffc822378000 task.ti: ffffffc822378000
+PC is at samsung_pin_dbg_show_by_type.isra.8+0x28/0x68
+LR is at samsung_pinconf_dbg_show+0x88/0xb0
+Call trace:
+[<ffffffc0003b6558>] samsung_pin_dbg_show_by_type.isra.8+0x28/0x68
+[<ffffffc0003b661c>] samsung_pinconf_dbg_show+0x84/0xb0
+[<ffffffc0003b66d8>] samsung_pinconf_group_dbg_show+0x90/0xb0
+[<ffffffc0003b4c84>] pinconf_groups_show+0xb8/0xec
+[<ffffffc0002118e8>] seq_read+0x180/0x3ac
+[<ffffffc0001f29b8>] vfs_read+0x90/0x148
+[<ffffffc0001f2e7c>] SyS_read+0x44/0x84
 ```
 
 #### G950F (Exynos Galaxy S8) [G950FXXU4CRI5] (September 1, 2018)
