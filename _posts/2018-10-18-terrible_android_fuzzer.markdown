@@ -5,6 +5,10 @@ date:   2018-10-18 02:57:20 -0700
 categories: fuzzing
 ---
 
+_So slimy it belongs in the slime tree_
+
+![Why](/assets/slimetree.jpg)
+
 # Changelog
 
 Date       | Info
