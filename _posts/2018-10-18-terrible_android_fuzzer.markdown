@@ -25,7 +25,7 @@ I recognize the bugs discussed here are not widespread Android bugs individually
 
 # Give me the code
 
-https://github.com/gamozolabs/slime_tree
+[Slime Tree Repo][slimetree]
 
 # Intro
 
@@ -717,3 +717,4 @@ fn main() {
 ```
 
 [gamozo]: https://twitter.com/gamozolabs
+[slimetree]: https://github.com/gamozolabs/slime_tree
