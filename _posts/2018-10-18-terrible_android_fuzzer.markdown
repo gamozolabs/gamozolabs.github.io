@@ -334,7 +334,7 @@ _Woo, it worked!_ Crashed faster, and this time we limited to `/sys`. So we know
 
 Now we'll go deeper in `/sys`, maybe we try `/sys/devices`... oops, no luck. We'll have to try another. Maybe `/sys/kernel`?... _WINNER WINNER!_
 
-So we've widdled it down further to `/sys/kernel/debug` but now there are 85 folders in this directory. I really don't want to manually try all of them. Maybe we can improve our fuzzer?
+So we've whittled it down further to `/sys/kernel/debug` but now there are 85 folders in this directory. I really don't want to manually try all of them. Maybe we can improve our fuzzer?
 
 # Improving the fuzzer
 
