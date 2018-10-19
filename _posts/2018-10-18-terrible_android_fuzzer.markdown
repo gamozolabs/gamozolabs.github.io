@@ -326,7 +326,7 @@ Using the above protips I've been able to get this fuzzer to work on almost ever
 
 Okay so we've looked at the latest Galaxy S8, let's try to look at an older Galaxy S5 (G900FXXU1CRH1). _Whelp, that one crashed even faster._ However if we try to get `/proc/last_kmsg` we will discover that this file does not exist. We can also try using a fancy UART cable over USB with the magic 619k resistor and `daemonize()` the application so we can observe the crash over that. However that didn't work in this case either (honestly not sure why, I get dmesg output but no panic log).
 
-So now we have this problem. How do we root cause this bug? Well, we can do a binary search of the filesystem and blacklist files in certain folders and try to widdle it down. Lets give that a shot!
+So now we have this problem. How do we root cause this bug? Well, we can do a binary search of the filesystem and blacklist files in certain folders and try to whittle it down. Lets give that a shot!
 
 First let's only allow use of `/sys/*` and beyond, all other files will be disallowed, typically these bugs from the fuzzer come from `sysfs` and `procfs`. We'll do this by changing the directory listing call to `listdirs(Path::new("/sys"), &mut dirlisting);`
 
@@ -480,7 +480,7 @@ In the future maybe I'll exploit one of these bugs in another blog, or root caus
 
 # Wall of Shame
 
-_Try it out on your own test phones (not on your actual phone, that'd probably be a bad idea). Let me know if you have any silly bugs to add to the wall of shame._
+_Try it out on your own test phones (not on your actual phone, that'd probably be a bad idea). Let me know if you have any silly bugs found by this to add to the wall of shame._
 
 #### G900F (Exynos Galaxy S5) [G900FXXU1CRH1] (August 1, 2017)
 
