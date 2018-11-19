@@ -1,0 +1,38 @@
+digraph D {
+    node [shape=record];
+    node [fontname=mono, fontsize=11];
+    graph [fontname=mono, fontsize=11];
+    newrank=true;
+    rankdir=LR;
+
+    memory:0 -> dedup:a;
+    memory:1 -> dedup:a;
+    memory:2 -> dedup:0;
+    memory:3 -> cmem:face;
+    memory:4 -> dedup:bang;
+
+    subgraph cluster_p {
+        label = "Master";
+
+        subgraph cluster_dedup {
+            label = "Dedup storage";
+            dedup [label="{<a>AA|<0>00|<bang>!!}"];
+        }
+    }
+        
+    subgraph cluster_c1 {
+        label = "Child (memory \"AAAA00:D!!\")";
+
+        subgraph cluster_c1_cow {
+            label = "CoW memory";
+            cmem [label="{<face>:D}"]
+        }
+
+        subgraph cluster_c1_mem {
+            label = "Page table";
+            memory [label="{<0>Page 0|<1>Page 1|<2>Page 2|<3>Page 3|<4>Page 4}"]
+        }
+        
+    }
+}
+
