@@ -7,6 +7,8 @@ categories: fuzzing
 
 This is the introduction of a multipart series. It is to give a high level overview without really deeply diving into any individual component.
 
+#### Read the next post in the series: [MMU Design](https://gamozolabs.github.io/fuzzing/2018/11/19/vectorized_emulation_mmu.html)
+
 _Vectorized emulation, why do I do this to myself?_
 
 ![Why](/assets/ve_codegen.png)
