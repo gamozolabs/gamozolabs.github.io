@@ -661,7 +661,11 @@ This tool is incredibly useful for validating hypothesises about behaviors of va
 
 # Source?
 
-Sorry, no plans to make this tool public for a while.
+Update: 8/19/2019
+
+This kernel has too many sensitive features that I do not want to make public at this time...
+
+However, it seems there's a lot of interest in this tech, so I will try to live stream soon adding this functionality to my already-open-source kernel [Orange Slice][orangeslice]!
 
 ---
 
@@ -673,3 +677,4 @@ Sorry, no plans to make this tool public for a while.
 [wikichipsite]: https://en.wikichip.org/
 [vecemu]: https://gamozolabs.github.io/fuzzing/2018/10/14/vectorized_emulation.html
 [squishable]: https://www.squishable.com/mm5/merchant.mvc?Screen=PROD&Product_Code=squish_shrimp_sushi_15
+[orangeslice]: https://github.com/gamozolabs/orange_slice
