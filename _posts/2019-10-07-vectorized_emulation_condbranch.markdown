@@ -51,13 +51,15 @@ Intel provides us with 8 kmask registers. `k0` through `k7`. `k0` is hardcoded i
 
 ### Online VM mask
 
-Since at any given time we might be performing operations with VMs disabled, we need to have one kmask register always dedicated to holding the mask of which VMs are actively running. Since `k1` is the first general purpose kmask we can use, that's exactly what we pick. Any bit which is clear in `k1` (VM is disabled), must not have its state modified. Thus you'll see `k1` is used as a merging mask for almost every single vectorized operation we do.
+Since at any given time we might be performing operations with VMs disabled, we need to have one kmask register always dedicated to holding the mask of VMs that are actively running. Since `k1` is the first general purpose kmask we can use, that's exactly what we pick. Any bit which is clear in `k1` (VM is disabled), must not have its state modified. Thus you'll see `k1` is used as a merging mask for almost every single vectorized operation we do.
 
-This mask must also be honored during scalar code to emulate vectorized operations (for example divs, which have no vectorized instruction).
+By using the `k1` mask in every instruction, we preseve the lanes of vector registers which are disabled. This provides near-zero-cost preservation of disabled VM states, such that we don't have to save/restore massive ZMM registers during divergence.
+
+This mask must also be honored during scalar code that emulates complex vectorized operations (for example divs, which have no vectorized instruction).
 
 ### "Following" VM mask
 
-At some points during emulation we run into situations where VMs have to get disabled. For example some VMs might take a true branch, and others might take the false (or "else") side of a branch. In this case we need to make a decision (very quickly) about which VM to follow. To do this, we have a VM which we mark as the "following" VM. In this case we store this "following" VM in `k7`. This is always only a single bit set, and it's the bit of the VM which we always will follow when we have to make divergence decisions.
+At some points during emulation we run into situations where VMs have to get disabled. For example, some VMs might take a true branch, and others might take the false (or "else") side of a branch. In this case we need to make a decision (very quickly) about which VM to follow. To do this, we have a VM which we mark as the "following" VM. We store this "following" VM mask in `k7`. This always contains a single bit, and it's the bit of the VM which we will always follow when we have to make divergence decisions.
 
 The VM we are "following" must always be active, and thus `(k7 & k1) != 0` must always be true! This `k7` mask only has to be updated when we enter the JIT, thus the computation of which VM to "follow" may be complex as it will not be a common expense. While the JIT is executing, this `k7` mask will never have to be updated unless the VM we are following causes a fault (at which point a new VM to follow will be computed).
 
@@ -100,7 +102,7 @@ Effectively `vpermq` uses the indicies in its second operand to select values fr
 
 ### "Desired target" vector
 
-We allocate one other ZMM register (`zmm31`) to hold the block identifiers for where each lane "wants" to execute. What this means is that when divergence occurs, `zmm31` will have the corresponding lane updated to where the VM that diverged "wanted" to go. VMs which were disabled thus can be analyzed to see where they "wanted" to go, if they werent' to have been masked off when the "following" VM was followed.
+We allocate one other ZMM register (`zmm31`) to hold the block identifiers for where each lane "wants" to execute. What this means is that when divergence occurs, `zmm31` will have the corresponding lane updated to where the VM that diverged "wanted" to go. VMs which were disabled thus can be analyzed to see where they "wanted" to go, but instead they got disabled :(
 
 ### ZMM Register Summary
 
@@ -110,7 +112,7 @@ Here's the complete state of ZMM register allocation during JIT
 Zmm0-Zmm3  - Scratch registers for internal JIT use
 Zmm4-Zmm29 - Used for IL register allocation
 Zmm30      - Index of the VM we are following broadcast to all 8 quadwords
-Zmm31      - Branch targets for each VM, indicates where disabled VMs want to be
+Zmm31      - Branch targets for each VM, indicates where all VMs want to execute
 ```
 
 ## General purpose registers
@@ -123,7 +125,7 @@ When ignoring the MMU, there are only 2 GPRs that we have a special use for...
 
 On the Knights Landing Xeon Phi (the CPU I develop vectorized emulation for), there is a huge bottleneck on the front-end and instruction decode. This means that loading a constant into a vector register by loading it into a GPR `mov`, then moving it into the lowest-order lane of a vector `vmovq`, and then broadcasting it `vpbroadcastq`, is actually a lot more expensive than just loading that value from memory.
 
-To enable this, we need a database which just holds constants. During the JIT, constants are allocated from this table (just by appending to the end and deduped). This table is then pointed to by `r11` during JIT. During the JIT we can load a constant into all active lanes of a VM by doing a single `vpbroadcastq zmm, kmask, qword [r11+OFFSET]` instruction.
+To enable this, we need a database which just holds constants. During the JIT, constants are allocated from this table (just appending to a list, while deduping shared constants). This table is then pointed to by `r11` during JIT. During the JIT we can load a constant into all active lanes of a VM by doing a single `vpbroadcastq zmm, kmask, qword [r11+OFFSET]` instruction.
 
 While this might not be ideal for normal Xeon processors, this is actually something that I have benchmarked, and on the Xeon Phi, it's much faster to use the constant storage database.
 
