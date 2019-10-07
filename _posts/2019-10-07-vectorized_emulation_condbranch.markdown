@@ -243,6 +243,22 @@ Once this is done, we can do a `jnz` instruction (same as `jne`), causing us to 
 
 ---
 
+# Update
+
+After a little nap, I realized that I could save 2 instructions during the conditional branch. I knew something was a little off as I've written similar code before and I never needed an inverse mask.
+
+![updated JIT](/assets/cbranch_jit_updated.png)
+
+Here we'll note that we removed 2 instructions. We no longer compute the inverse mask. Instead, we initially store the false target block labels into `zmm31` using the online mask (`k1`). This temporarly marks that "all online VMs want to take the false target". Then, using the `k2` mask (true targets), merge over `zmm31` with the true target block labels.
+
+Simple! We remove the inverse mask computation `kandnw`, and the use of the `zmm0` temporary and merge directly into `zmm31`. But the effect is exactly the same as the previous version.
+
+Not quite sure why I thought the inverse mask was needed, but it goes to show that a little bit of rest goes a long way!
+
+Due to instruction decode pressure on the Xeon Phi (2 instructions decoded per cycle), this change is a _minimum_ 1 cycle improvement. Further, it's a reduction of 8 bytes of code per conditional branch, which reduces L1i pressure. This is likely in the single digit percentages for overall JIT speedup, as conditional branches are _everywhere_!
+
+---
+
 # Fin
 
 And that's it! That's currently how I handle auto-merging during conditional branches in vectorized emulation as of today! This code is often changed and this is probably not its final form. There might be a simpler way to achieve this (fewer instructions, or lower latency instructions)... but progress always happens over time :)
