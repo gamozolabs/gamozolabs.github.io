@@ -13,6 +13,12 @@ Let me know if you like this mini-blog format! It takes a lot less time than a w
 
 ---
 
+# Prereqs
+
+You should probably read the [Introduction to Vectorized Emulation blog][intro blog]!
+
+Or perhaps watch the [talk I gave at RECON 2019][recontalk]
+
 # Summary
 
 I spent this weekend working on a JIT for my IL (FalkIL, or fail). I thought this would be a cool opportunity to make a mini-blog describing how I currently handle conditional branches in vectorized emulation.
@@ -241,9 +247,14 @@ Once this is done, we can do a `jnz` instruction (same as `jne`), causing us to 
 
 And that's it! That's currently how I handle auto-merging during conditional branches in vectorized emulation as of today! This code is often changed and this is probably not its final form. There might be a simpler way to achieve this (fewer instructions, or lower latency instructions)... but progress always happens over time :)
 
+It's important to note that this auto-merging isn't perfect, and _most_ cases will result in VMs hanging, but this is an extremely low cost way to bring VMs online dynamically in even the tightest loops. More macro-scale merging can be done with smarter static-analysis and control flow decisions.
+
 I hope this was a fun read! Let me know if you want more of these mini-blogs.
 
 ---
 
 [gamozo]: https://twitter.com/gamozolabs
+[intro blog]: https://gamozolabs.github.io/fuzzing/2018/10/14/vectorized_emulation.html
 [MMU blog]: https://gamozolabs.github.io/fuzzing/2018/11/19/vectorized_emulation_mmu.html
+[recontalk]: https://recon.cx/media-archive/2019/Session.004.Brandon_Falk.Vectorized_Emulation_Putting_it_all_together-kFn8Kr6lsNZQZ.mp4
+
