@@ -194,7 +194,7 @@ After these 2 instructions execute, `zmm0` now holds the target "labels" based o
 
 ![merge into master](/assets/cbranch_jit_inst5.png)
 
-Now we merge in the target branches for the active VMs which were just computed (`zmm0`), into the master target register (`zmm31`). Since VMs can be disabled via divergence, `zmm31` holds the "master" copy of where all VMs want to go (including ones which have been masked off and are "waiting" to execute a certain target).
+Now we merge the target branches for the active VMs which were just computed (`zmm0`), into the master target register (`zmm31`). Since VMs can be disabled via divergence, `zmm31` holds the "master" copy of where all VMs want to go (including ones which have been masked off and are "waiting" to execute a certain target).
 
 `zmm31` now holds the target labels for every single lane with the updated results of this comparison!
 
@@ -221,7 +221,7 @@ Effectively, `zmm1` will contain the block label for the target that the VM we a
 
 ![auto-merging](/assets/cbranch_jit_inst7.png)
 
-This is where the magic happens. `zmm31` contains where all the VMs "want to execute", and `zmm1` from the above instruction contains where we are actually going to execute. Thus, we compute a new `k1` (active VM kmask) based on equality between `zmm30` and `zmm31`.
+This is where the magic happens. `zmm31` contains where all the VMs "want to execute", and `zmm1` from the above instruction contains where we are actually going to execute. Thus, we compute a new `k1` (active VM kmask) based on equality between `zmm31` and `zmm1`.
 
 Or in more simple terms... if a VM that was previously disabled was waiting to execute the block we're about to go execute... bring it back online!
 
@@ -231,7 +231,7 @@ Or in more simple terms... if a VM that was previously disabled was waiting to e
 
 Now we're at the end. `k2` still holds the true targets. We and this with `k7` (the "following" VM mask) to figure out if the VM we are following is going to take the branch or not.
 
-We then need to make this result "actionable" by getting it into the `eflags` x86 register such that we can conditionally branch based off of it. This is done with a simple `kortestw` instruction with itself. This will cause the zero flag to get set in `eflags` if `k2` is equal to zero.
+We then need to make this result "actionable" by getting it into the `eflags` x86 register such that we can conditionally branch. This is done with a simple `kortestw` instruction of `k2` with itself. This will cause the zero flag to get set in `eflags` if `k2` is equal to zero.
 
 Once this is done, we can do a `jnz` instruction (same as `jne`), causing us to jump to the true target path if the `k2` value is non-zero (if the VM we're following is taking the true path). Otherwise we fall through to the "false" path (or potentially branch to it if it's not directly following this block).
 
