@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Intel Load Port Observing and Sequencing"
+title:  "CPU Introspection: Intel Load Port Snooping"
 date:   2019-12-29 21:11:15 -0700
 categories: metrology
 ---
