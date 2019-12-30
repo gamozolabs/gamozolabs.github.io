@@ -676,7 +676,11 @@ side of memory transactions.
 
 As with anything I do, performance is always an opportunity for improvement.
 Getting a higher-fidelity MLPDS exploit, potentially with higher throughput,
-would always help make collecting data easier.
+would always help make collecting data easier. I've also got some fun ideas for
+filtering this data to remove "deterministic noise". Since we're attacking from
+a sibling hyperthread I suspect we'd see some deterministic sliding and
+interleaving of core usage. If I could isolate these down and remove the noise
+that'd help a lot.
 
 I hope you enjoyed this blog! See you next time!
 
