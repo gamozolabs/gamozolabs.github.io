@@ -563,7 +563,7 @@ access will always access at offset 8, thus we expect to see a load of
 
 #### Graphing the data
 
-To graph the data we have colleted, we want to collect the frequencies each
+To graph the data we have collected, we want to collect the frequencies each
 value was seen for every cycle offset. We'll plot these with an x axis in
 cycles, and a y axis in frequency the value was observed at that cycle count.
 Then we'll overlay multiple graphs for the different values we've seen. Let's
