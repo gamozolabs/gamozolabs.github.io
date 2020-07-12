@@ -1,0 +1,120 @@
+---
+layout: post
+title:  "Fuzz Week 2020"
+date:   2020-07-12 00:11:15 -0700
+\categories: announcement
+---
+
+# Summary
+
+Welcome to fuzz week 2020! This week (July 13th - July 17th) I'll be streaming
+every day going through some of the very basics of fuzzing all the way to
+cutting edge research. I want to use this time to talk about some things
+related to fuzzing, particularly when it comes to benchmarking and comparing
+fuzzers with each other.
+
+# Schedule
+
+Ha. There's really no schedule, there is no script, there is no plan, but
+here's a rough outline of what I want to cover.
+
+I will be streaming on my [Twitch channel][twitch] at approximately
+[14:00 PST][time]. But things aren't really going to be on a strict schedule.
+
+My [Twitter][twitter] is probably the best source of information for when
+things are about to start.
+
+Everything will be recorded and uploaded to my [YouTube][youtube].
+
+#### July 13th
+
+The very basics of fuzzing. We'll write our own fuzzer and tweak it to improve
+it. We'll probably start by writing it in Python, and eventually talk about the
+performance ramifications and the basics of scaling fuzzers by using threads or
+multiple processes. We'll also compare our newly written fuzzer against AFL and
+see where AFL outperforms it, and also where AFL has some blind spots.
+
+#### July 14th
+
+Here we'll cover code coverage. We might get to this sooner, who knows. But
+we're going to write our own tooling to gather code coverage information such
+that we can see not only how easy it is to set up, but how flexible coverage
+information can be while still proving quite useful!
+
+#### July 15th-17th
+
+Here we'll focus mainly on the advanced aspects of fuzzing. While this sounds
+complex, fuzzing really hasn't become that complex yet, so follow along! We'll
+go through some of the more deep performance properties of fuzzing, mainly
+focused around snapshot fuzzing.
+
+Once we've discussed some basics of performance and snapshot fuzzing, we'll
+start talking about the meaningfulness of comparing fuzzers. Namely, the
+difficulties in comparing fuzzers when they may involve different concepts of
+what a crash, coverage, or input are. We'll look at some existing examples of
+papers which compare fuzzers, and see how well they actually prove their point.
+
+# Biases
+
+I think it's important when doing something like this, to make it clear what my
+existing biases are. I've got a few.
+
+- I think existing fuzzers have some major performance problems and struggle to
+  scale. I consider this to be a high priority as general performance
+  improvements to fuzzing harnesses makes both generic fuzzers (eg. AFL,
+  context-unaware fuzzers) and hand-crafted (targeted) fuzzers better.
+- I don't think outperforming AFL is impressive. AFL is impressive because it's
+  got an easy-to-use workflow, which makes it accessible to many different
+  users, broadening the amount of targets it has been used against.
+- I don't really thinking comparing fuzzers is reasonable.
+- I think it is very easy to over-fit a fuzzer to small programs, or add
+  unrealistic amounts of information extraction from a target under test, in a
+  way that the concepts are not generally applicable to many targets that
+  exceed basic parsers. I think this is where a lot of current research falls.
+
+But... that's mainly the point of this week. To either find out my biases are
+wildly incorrect, or to maybe demonstrate why I have some of the biases. So,
+how will I address some of these (in order of prior bullets)?
+
+- I'll compare some of my fuzzers against AFL. We'll see if we can outperform
+  AFL in terms of raw fuzz cases performed, as well as the results (coverage
+  and crashes).
+- I'll try to demonstrate that a basic fuzzer with 1/100th the amount of code
+  of AFL is capable of getting much better results, and that it's really not
+  that hard to write.
+- I'll propose some techniques that can be used to compare fuzzers, and go
+  through my own personal process of evaluating fuzzers. I'm not trying to get
+  papers, or funding, or anything. I don't really have an interest in making
+  things look comparatively better. If they perform differently, but have
+  different use cases, I'd rather understand those cases and apply them
+  specifically rather than have a one-shoe-fits-all solution.
+- I'll go through some instrumentation that I've historically added to my
+  fuzzers which give them massive result and coverage boosts, but consume so
+  much information that they cannot meaningfully scale past tiny pieces of
+  code. I'll go through when these things may actually be useful, as sometimes
+  isolating components is viable. I'll also go through some existing papers and
+  see what sorts of results are being claimed, and if they actually have
+  general applicability.
+
+# Winging it
+
+It's important to note, nothing here is scheduled. Things may go much faster,
+slower, or just never happen. That's the beauty of research. I may be very
+wrong with some of my biases, and we'll hopefully correct those. I love being
+wrong.
+
+I've maybe thought of having some fuzzing figureheads pop on the stream for
+random discussions/conversations/interviews. If this is something that sounds
+interesting to you, reach out and we can maybe organize it!
+
+# Sound fun?
+
+See you there :)
+
+---
+
+[twitter]: https://twitter.com/gamozolabs
+[twitch]: https://twitch.tv/gamozo
+[time]: https://www.timeanddate.com/worldclock/fixedtime.html?msg=Fuzz+Week+Approx+Stream+Start&iso=20200713T14&p1=234
+[youtube]: https://www.youtube.com/user/gamozolabs
+
