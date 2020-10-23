@@ -287,7 +287,7 @@ I have the 4x 6252N system, so we'll run vectorized emulation in "light blue" li
 
 Sweet, we're under 10 GiB of memory usage for the whole system, so we're not really cheating by skimping on the memory in our theoretical 64 GiB build.
 
-Well, we're getting about **700 million fuzz cases per second on the whole system**. Woo! That's a shitton! That is _77k iters/second/$_. Obviously this seems "lower" than what we saw before, but this is the iters/second for a one time dollar investment, not a per-house cloud fee.
+Well, we're getting about **700 million fuzz cases per second on the whole system**. Woo! That's a shitton! That is _77k iters/second/$_. Obviously this seems "lower" than what we saw before, but this is the iters/second for a one time dollar investment, not a per-hour cloud fee.
 
 So... what do we get on the GPU? Well, they concluded with getting 8.4 million iters/sec on the cloud compute GPU. Assuming it's close to the performance you get on bare metal (since they picked the non-preemptable GPU option), we can just multiply this number by 4 to get the iters/sec on this theoretical machine. We get 33.6 million iterations per second total, if we had 4 GPUs (assuming linear scaling and stuff, which I think is totally fair). Well... that's 3,733 iters/second/$... or about 21x more expensive than vectorized emulation.
 
