@@ -309,6 +309,18 @@ I can't wait to see more research from you all! This is incredible. You're givin
 
 ---
 
+## Random opinions
+
+I've been asked a few things about my opinion on the GPU-based fuzzing, I'll answer them here.
+
+# Is not having syscalls a problem?
+
+No. It's not. It is for people who want to _use_ the tool. But it's a research problem. GPUs are turing complete, we can definitely emulate syscalls on them if needed. It might be a lot of work, a lot of plumbing, maybe a perf hit, but it doesn't stop it from being possible. Most of my fuzzers rely on emulating syscalls.
+
+There's also nothing preventing GPUs from being used to emulate an whole OS. You'd have to handle self-modifying code and virtual memory, which can get very expensive in an emulator, but with making software TLBs these things can be manageable to a level it's still worth doing!
+
+---
+
 ## Social
 
 I've been streaming a lot more regularly on my [Twitch][twitch]! I've developed hypervisors for fuzzing, mutators, emulators, and just done a lot of fun fuzzing work on stream. Come on by!
