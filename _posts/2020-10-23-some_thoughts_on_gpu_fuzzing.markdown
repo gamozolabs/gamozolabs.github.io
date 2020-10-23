@@ -277,7 +277,7 @@ For these benchmarks I'm going to use my own server that I host in my house and 
 
 For GPUs, the Tesla T4s are $2,152 per GPU, and have 16 GiB of RAM each. Lets just ignore all the PCI slotting, motherboards, and CPU required for a machine to host them, and we'll just say we build the cheapest possible chassis, motherboard, PSU, and CPUs, and somehow can socket these in a $1k server. My server is about $9k just for the 4 CPUs + $2k in chassis and motherboards, and thus that leaves us with $8k budget for GPUs. Lets just say we buy 4 Tesla T4s and throw them in the $1k server, and we got them for $2k each. Okay, we have a 4 Tesla T4 machine and a 4 socket Xeon 6252N server for about $9k. We're fudging some of the numbers to give the GPUs an advantage since a $1k chassis is cheap, so we'll just say we threw 64 GiB into the server to match the GPUs ram and call it "even".
 
-Okay, so we have 2 theoretical systems. One with 96C/192T of Xeon 6252Ns and 64 GiB RAM, and one with 4 Tesla T4s with 64 GiB VRAM. They're about $9k-$11k depending on what deals you can get, so we'll say both were $9k total all-in.
+Okay, so we have 2 theoretical systems. One with 96C/192T of Xeon 6252Ns and 64 GiB RAM, and one with 4 Tesla T4s with 64 GiB VRAM. They're about $9k-$11k depending on what deals you can get, so we'll say each one was $9k.
 
 Well, how does it stack up?
 
