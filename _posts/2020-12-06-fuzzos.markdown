@@ -29,7 +29,7 @@ To keep you on the edge of your toes, I'll first start with the boring things th
 
 ### OS
 
-We have to make an operating system which boots. We're gonna make a UEFI kernel, and we might dabble in running it on ARM64 as most of our code will be platform agnostic. But, who knows.
+We have to make an operating system which boots. We're gonna make a UEFI kernel, and we might dabble in running it on ARM64 as most of our code will be platform agnostic. But, who knows. It'll be a pretty generic kernel, I'm mainly going to develop it on bare metal, but of course, we'll make sure it runs on KVM/Xen/Hyper-V such that it can be used in a cloud environment.
 
 ### ACPI
 
@@ -54,6 +54,10 @@ Okay, that stuff was boring, lets talk about the fun parts!
 Since we'll be "snapshotting" memory itself, we need to make sure things like pointers aren't a problem. The fastest, easiest, and best solution to this, is simply to make sure the memory always gets loaded at the same address. This is no problem for a single core, but it's difficult for multiple cores, as they need to have copies of the same data mapped at the same location.
 
 What's the solution? Well of course, we'll have every single core on the system running it's own address space. This means there is no shared memory between cores (with some very, very minor execeptions). Not only does this lead to execeptionally high memory access performance (due to caches only being in the exclusive or shared states), but it also means that shared (mutable) memory will not be a thing! This means that we'll do all of our core synchronization through message passing, which is higher latency in the best case than shared memory models, but with an advantage of scaling much better. As long as our messages can be serialized to TCP streams, that means we can scale across the network without any effort.
+
+This has some awesome properties since we no longer need any locks to our page tables to add and remove entries, nor do we need to perform any TLB shootdowns, which can cost tens thousands of cycles.
+
+I used this model in [Sushi Roll][sushiroll], and I really miss it. It had incredibly good performance properties and forced a bit more thought about sharing information between cores.
 
 ### Scaling
 
