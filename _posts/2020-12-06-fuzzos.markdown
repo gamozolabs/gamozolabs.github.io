@@ -102,4 +102,4 @@ and I learn!
 [vecemu]: https://gamozolabs.github.io/fuzzing/2018/10/14/vectorized_emulation.html
 [youtube]: https://www.youtube.com/user/gamozolabs
 [cmilk]: https://github.com/gamozolabs/chocolate_milk
-
+[sushiroll]: https://gamozolabs.github.io/metrology/2019/08/19/sushi_roll.html
