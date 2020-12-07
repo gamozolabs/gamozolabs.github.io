@@ -1,0 +1,101 @@
+---
+layout: post
+title:  "FuzzOS"
+date:   2020-12-06 16:11:15 -0700
+categories: fuzzing
+---
+
+## Summary
+
+We're going to work on an _operating system_ which is designed specifically for fuzzing! This is going to be a streaming series for most of December which will cover making a new operating system with a strong focus on fuzzing. This means that things like the memory manager, determinism, and scalability will be the most important parts of the OS, and a lot of effort will go into making them super fast!
+
+## When
+
+Streaming will start sometime on Thursday, December 10th, probably around 18:00 UTC, but the streams will be at relatively random times on relatively random days. I can't really commit to specific times!
+
+Streams will likely be 4-5 days a week (probably M-F), and probably 8-12 hours in length. We'll see, who knows, depends how much fun we have!
+
+## Where
+
+You'll be able to find the streams live on my [Twitch Channel][twitch], and if you're unlucky and miss the streams, you'll be able to find the recordings on my [YouTube Channel][youtube]! Don't forget to like, comment, and subscribe, of course.
+
+## What
+
+So... ultimately, I don't really know what all will happen. But, I can predict a handful of things that we'll do. First of all, it's important to note that these streams are not training material. There is no prepared script, materials, flow, etc. If we end up building something totally different, that's fine and we're just going with the flow. There is no requirement of completing this project, or committing to certain ways the project will be done. So... with that aside.
+
+We'll be working on making an operating system, specifically for x86-64 (Intel flavor processors at the start, but AMD should work in non-hypervisor mode). This operating system will be designed for fuzzing, which means we'll want to focus on making virtual memory management extremely fast. This is the backbone of most performant fuzzing, and we'll need to be able to map in, unmap, and restore pages as they are modified by a fuzz case.
+
+To keep you on the edge of your toes, I'll first start with the boring things that we have to do.
+
+### OS
+
+We have to make an operating system which boots. We're gonna make a UEFI kernel, and we might dabble in running it on ARM64 as most of our code will be platform agnostic. But, who knows.
+
+### ACPI
+
+We're gonna need to write ACPI table parsers such that we can find the NUMA locality of memory and CPUs on the system. This will be critical to getting a high performance memory manager that scales with cores.
+
+### Multi-processing
+
+Of course, the kernel will support multiple cores, as otherwise it's kinda useless for compute.
+
+### 10gbit networking + TCP stack
+
+Since I never work with disks, I'm going to follow my standard model of just using the network as general purpose whatever. To do this, we'll need 10gbit network drivers and a TCP stack such that we can communicate with the rest of a network. Nothing too crazy here, we'll probably borrow some code from [Chocolate Milk][cmilk]
+
+---
+
+## Interesting stuff
+
+Okay, that stuff was boring, lets talk about the fun parts!
+
+### Exotic memory model
+
+Since we'll be "snapshotting" memory itself, we need to make sure things like pointers aren't a problem. The fastest, easiest, and best solution to this, is simply to make sure the memory always gets loaded at the same address. This is no problem for a single core, but it's difficult for multiple cores, as they need to have copies of the same data mapped at the same location.
+
+What's the solution? Well of course, we'll have every single core on the system running it's own address space. This means there is no shared memory between cores (with some very, very minor execeptions). Not only does this lead to execeptionally high memory access performance (due to caches only being in the exclusive or shared states), but it also means that shared (mutable) memory will not be a thing! This means that we'll do all of our core synchronization through message passing, which is higher latency in the best case than shared memory models, but with an advantage of scaling much better. As long as our messages can be serialized to TCP streams, that means we can scale across the network without any effort.
+
+### Scaling
+
+As with most things I write, linear scaling will be required, and scaling across the network is just implied, as it's required for really any realistic application of fuzzing.
+
+### Fast and differential memory snapshotting
+
+So far, none of these things are super interesting. I've had many OSes that do these things well, for fuzzing, for quite a long time. However, I've never made these memory management techniques into a true data structure, rather I use them as needed manually. I plan to make the core of this operating system, a combination of Rust procedural macros and virtual memory management tricks to allow for arbitrary data structure to be stored in a tree-shaped checkpointed structure.
+
+This will allow for fast transitions between different state of the structure as they were snapshotted. This will be done by leveraging the dirty bits in the page tables, and creating an allocator that will allocate in a pool of memory which will be saved and restored on snapshots. This memory will be treated as an opaque blob internally, and thus it can hold any information you want, device state, guest memory state, register state, something completely unrelated to fuzzing, won't matter. To handle nested structures (or more specifically, pointers in structures which are to be tracked), we'll use a Rust procedural macro to disallow untracked pointers within tracked structures.
+
+Effectively, we're going to heavily leverage the hardware's MMU to differentally snapshot, teleport between, and restore blobs of memory. For fuzzing, this is necessary as a way to hold guest memory state and register state. By treating this opaquely, we can focus on doing the MMU aspects really well, and stop worrying about special casing all these variables that need to be restored upon resets.
+
+### Linux emulator
+
+Okay, so all of that is kinda to make room for developing high performance fuzzers. In my case, I want this mainly for a new rewrite of vectorized emulation, but to make it interesting for others, we're going to implement a Linux emulator capable of running QEMU.
+
+This means that we'll be able to (probably staticially only) compile QEMU. Then we can take this binary, and load it into our OS and run QEMU in our OS. This means we can control the syscall responses to the requests QEMU makes. If we do this deterministically (we will), this means QEMU will be deterministic. Which thus means, the guest inside of QEMU will also be deterministic. You see? This is a technique I've used in the past, and works exceptionally well. We'll definitely outperform Linux's handling of syscalls, and we'll scale better, and we'll blow Linux away when it comes to memory management.
+
+### KVM emulator + hypervisor
+
+So, I have no idea how hard this would be, but from about 5 minutes of skimming the interwebs, it seems that I could pretty easily write a hypervisor in my OS that emulates KVM ioctls. Meaning QEMU would just think KVM is there, and use it!
+
+This will give us full control of QEMU's determinism, syscalls, performance, and reset speeds... without actually having to modify QEMU code.
+
+## That's it
+
+So that's the plan. An OS + fast MMU code + hypervisor + Linux emulator, to allow us to deterministically run anything QEMU can run, which is effectively everything. We'll do this with performance likely into the millions of VM resets per second per core, scaling linearly with cores, including over the network, to allow some of the fastest general purpose fuzzing the world has ever seen :D
+
+---
+
+## Social
+
+I've been streaming a lot more regularly on my [Twitch][twitch]! I've developed hypervisors for fuzzing, mutators, emulators, and just done a lot of fun fuzzing work on stream. Come on by!
+
+Follow me at [@gamozolabs][gamozo] on Twitter if you want notifications when
+new blogs come up. I often will post data and graphs from data as it comes in
+and I learn!
+
+[gamozo]: https://twitter.com/gamozolabs
+[twitch]: https://twitch.tv/gamozo
+[vecemu]: https://gamozolabs.github.io/fuzzing/2018/10/14/vectorized_emulation.html
+[youtube]: https://www.youtube.com/user/gamozolabs
+[cmilk]: https://github.com/gamozolabs/chocolate_milk
+
