@@ -87,6 +87,42 @@ This will give us full control of QEMU's determinism, syscalls, performance, and
 
 So that's the plan. An OS + fast MMU code + hypervisor + Linux emulator, to allow us to deterministically run anything QEMU can run, which is effectively everything. We'll do this with performance likely into the millions of VM resets per second per core, scaling linearly with cores, including over the network, to allow some of the fastest general purpose fuzzing the world has ever seen :D
 
+## FAQ
+
+Some people have asked questions on the internet, and I'll post them here:
+
+### Hackernews Q1
+
+Q:
+
+```
+Huh. So my initial response was, "why on earth would you need a whole OS for that", but memory snapshotting and improved virtual memory performance might actually be a good justification. Linux does have CRIU which might be made to work for such a purpose, but I could see a reasonable person preferring to do it from a clean slate. On the other hand, if you need qemu to run applications (which I'm really unclear about; I can't tell if the plan is to run stuff natively on this OS or just to provide enough system to run qemu and then run apps on linux on qemu) then I'm surprised that it's not easier to just make qemu do what you want (again, I'm pretty sure qemu already has its own memory snapshotting features to build on).
+
+Of course, writing an OS can be its own reward, too:) 
+```
+
+A:
+
+```
+Oooh, wasn't really expecting this to make it to HN cause it was meant to be more of an announcement than a description.
+
+But yes, I've done about 7 or 8 operating systems for fuzzing in the past and it's a massive performance (and cleanliness) cleanup. This one is going to be like an operating system I wrote 2-3 years ago for my vectorized emulation work.
+
+To answer your QEMU questions, the goal is to effectively build QEMU with MUSL (just to make it static so I don't need a dynamic loader), and modify MUSL to turn all syscalls to `call` instructions. This means a "syscall" is just a call to another area, which will by my Rust Linux emulator. I'll implement the bare minimum syscalls (and enum variants to those syscalls) to get QEMU to work, nothing more. The goal is not to run Linux applications, but run a QEMU+MUSL combination which may be modified lightly if it means a lower emulation burden (eg. getting rid of threading in QEMU [if possible] so we can avoid fork())
+
+The main point of this isn't performance, it's determinism, but that is a side effect. A normal syscall instruction involves a context switch to the kernel, potentially cr3 swaps depending on CPU mitigation configuration, and the same to return back. This can easily be hundreds of cycles. A `call` instruction to something that handles the syscall is on the order of 1-4 cycles.
+
+While for syscalls this isn't a huge deal, it's even more emphasized when it comes to KVM hypercalls. Transitions to a hypervisor are very expensive, and in this case, the kernel, the hypervisor, and QEMU (eg. device emulation) will all be running at the same privilege level and there won't be a weird QEMU -> OS -> KVM -> other guest OS device -> KVM -> OS -> QEMU transition every device interaction.
+
+But then again, it's mainly for determinism. By emulating Linux deterministically (eg. not providing entropy through times or other syscall returns), we can ensure that QEMU has no source of external entropy, and thus, will always do the same thing. Even if it uses a random-seeded hash table, the seed would be derived from syscalls, and thus, will be the same every time. This determinism means the guest always will do the same thing, to the instruction. Interrupts happen on the same instructions, context switches do, etc. This means any bug, regardless of how complex, will reproduce every time.
+
+All of this syscall emulation + determinism I have also done before, in a tool called tkofuzz that I wrote for Microsoft. That used Linux emulation + Bochs, and it was written in userspace. This has proven incredibly successful and it's what most researchers are using at Microsoft now. That being said, Bochs is about 100x slower than native execution, and now that people have gotten a good hold of snapshot fuzzing (there's a steep learning curve), it's time to get a more performant implementation. With QEMU with get this with a JIT, which at least gets us a 2-5x improvement over Bochs while still "emulating", but even more value could be found if we get the KVM emulation working and can use a hypervisior. That being said, I do plan to support a "mode" where guests which do not touch devices (or more specifically, snapshots which are taken after device I/O has occurred) will be able to run without QEMU at all. We're really only using QEMU for device emulation + interrupt control, thus, if you take a snapshot to a function that just parses everything in one thread, without process IPC or device access (it's rare, when you "read" from a disk, you're likely just hitting OS RAM caches, and thus not devices), we can cut out all the "bloat" of QEMU and run in a very very thin hypervisor instead.
+
+In fuzzing it's critical to have ways to quickly map and unmap memory as most fuzz cases last for hundreds of microseconds. This means after a few hundred microseconds, I want to restore all memory back to the state "before I handled user input" and continue again. This is extremely slow in every conventional operating system, and there's really no way around it. It's of course possible to make a driver or use CRIU, but these are still not exactly the solution that is needed here. I'd rather just make an OS that trivially runs in KVM/Hyper-V/Xen, and thus can run in a VM to get the cross-platform support, rather than writing a driver for every OS I plan to use this on.
+
+Stay cute, ~gamozo 
+```
+
 ---
 
 ## Social
