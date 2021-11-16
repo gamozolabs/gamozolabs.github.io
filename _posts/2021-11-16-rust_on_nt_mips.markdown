@@ -63,7 +63,7 @@ for the repos as of this writing if things have changed since you've read this!
 
 Don't forget to follow me on socials and like and subscribe of course. Maybe
 eventually I can do research and education full time!~ Oh, also follow me on
-my [gamozolabs][twitter]
+my Twitter [@gamozolabs][gamozo]
 
 ## MIPS on Windows NT
 
