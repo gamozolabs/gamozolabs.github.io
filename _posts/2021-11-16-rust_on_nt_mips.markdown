@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Rust on MIPS64 Windows NT 4.0"
-date:   2020-12-06 16:11:15 -0700
+date:   2021-11-16 00:00:00 -0700
 categories: fuzzing
 ---
 
