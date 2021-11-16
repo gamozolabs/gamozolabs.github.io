@@ -2,6 +2,7 @@
 layout: post
 title:  "Rust on MIPS64 Windows NT 4.0"
 date:   2021-11-16 00:00:00 -0700
+image:  "/assets/nt4_bsod.png"
 categories: fuzzing
 ---
 
